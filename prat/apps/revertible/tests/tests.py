@@ -1,7 +1,7 @@
 from django.test import TransactionTestCase
 from .utils import RevertTool
 from .models import SimpleTrackedModel, SimpleUntrackedModel, \
-    Snapshot, DummyParentModel, ComplexTrackedModel
+    Snapshot, SimpleParentModel, ComplexTrackedModel, SimpleChildModel
 
 import json
 
@@ -15,7 +15,8 @@ class GitPratTest(TransactionTestCase):
 
         """
         dummy_object = SimpleUntrackedModel.objects.create(  # noqa
-            title="Random title", price=100)
+            title="Random title",
+            price=100)
 
         return dummy_object
 
@@ -26,7 +27,8 @@ class GitPratTest(TransactionTestCase):
 
         """
         dummy_object = SimpleTrackedModel.objects.create(  # noqa
-            title="Random title", price=100)
+            title="Random title",
+            price=100)
 
         return dummy_object
 
@@ -36,11 +38,31 @@ class GitPratTest(TransactionTestCase):
         Создание throwaway объекта ComplexTrackedModel
 
         """
-        dummy_relation = DummyParentModel.objects.create(field="Lorem ipsum")  # noqa
-        dummy_complex_object = ComplexTrackedModel.objects.create(  # noqa
-            title="Random title", price=100, dummy=dummy_relation)
+        parent = SimpleParentModel.objects.create(field="Lorem ipsum")  # noqa
+        complex_object = ComplexTrackedModel.objects.create(  # noqa
+            title="Random title",
+            price=100,
+            dummy=parent)
 
-        return dummy_complex_object
+        return complex_object
+
+    @staticmethod
+    def get_complex_tracked_model_object_with_child() -> ComplexTrackedModel:
+        """
+        Создание throwaway объекта ComplexTrackedModel
+
+        """
+        parent = SimpleParentModel.objects.create(field="Lorem ipsum")  # noqa
+        complex_object = ComplexTrackedModel.objects.create(  # noqa
+            title="Random title",
+            price=100,
+            dummy=parent)
+
+        SimpleChildModel.objects.create(
+            title="Child models title",
+            complex_tracked_model=complex_object)
+
+        return complex_object
 
     def test_fails_on_snapshotting_untracked_model_object(self):
         """
@@ -181,6 +203,26 @@ class GitPratTest(TransactionTestCase):
         json.dumps(
             RevertTool.make_snapshot(self.get_complex_tracked_model_object()),
             indent=4)
+
+    def test_has_children_method_returns_false_for_complex_object_without_child(self):
+        """
+        Ожидается, что has_children вернет True, если объект
+        переданной в аргументах модели не связан
+        с прочей детской моделью
+
+        """
+
+        self.assertFalse(RevertTool.has_children(self.get_complex_tracked_model_object()))
+
+    def test_has_children_method_returns_true_for_complex_object_with_child(self):
+        """
+        Ожидается, что has_children вернет True, если объект
+        переданной в аргументах модели связан
+        с прочей детской моделью
+
+        """
+
+        self.assertTrue(RevertTool.has_children(self.get_complex_tracked_model_object_with_child()))
 
     def test_revert_simple_model_one_step_successful(self):
         pass

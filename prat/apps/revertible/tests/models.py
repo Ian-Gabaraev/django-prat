@@ -21,7 +21,7 @@ class SimpleTrackedModel(TrackedModelBase):
     price = models.PositiveIntegerField(default=0)
 
 
-class DummyParentModel(models.Model):
+class SimpleParentModel(models.Model):
     field = models.CharField(default="",
                              max_length=64)
 
@@ -30,12 +30,17 @@ class ComplexTrackedModel(TrackedModelBase):
     title = models.CharField(default="",
                              max_length=256)
     price = models.PositiveIntegerField(default=0)
-    dummy = models.ForeignKey(to=DummyParentModel,
+    dummy = models.ForeignKey(to=SimpleParentModel,
                               null=True,
                               on_delete=models.SET_NULL)
 
+    class TrackingData:
+        children = ["SimpleChildModel"]
+
 
 class SimpleChildModel(models.Model):
+    title = models.CharField(default="",
+                             max_length=256)
     complex_tracked_model = models.ForeignKey(
         to=ComplexTrackedModel,
         null=True,

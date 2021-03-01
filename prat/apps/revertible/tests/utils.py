@@ -6,6 +6,7 @@ class RevertTool:
 
     @staticmethod
     def is_revertible(model_object: Model) -> bool:
+
         return TrackedModelBase in model_object.__class__.__mro__
 
     @staticmethod
@@ -19,8 +20,22 @@ class RevertTool:
         )
 
     @staticmethod
+    def count_children(model_object: Model) -> list:
+
+        return [
+            getattr(model_object, f"{child_model_name.lower()}_set").count()
+            for child_model_name in model_object.TrackingData.children  # noqa
+        ]
+
+    @staticmethod
+    def has_children_metadata(model_object: Model) -> bool:
+
+        return hasattr(model_object, "TrackingData") and hasattr(model_object.TrackingData, "children")
+
+    @staticmethod
     def has_children(model_object: Model) -> bool:
-        pass
+
+        return RevertTool.has_children_metadata(model_object) and any(RevertTool.count_children(model_object))
 
     @staticmethod
     def get_parent_fields(model_object: Model):
@@ -62,6 +77,18 @@ class RevertTool:
         }
 
     @staticmethod
+    def collect_children(model_object: Model):
+
+        result = []
+
+        for child_table_name in getattr(model_object.TrackingData, "children"):
+
+            for child_table_object in getattr(model_object, f"{child_table_name.lower()}_set").all():
+                result.append(RevertTool.backtrack_for_data(child_table_object))
+
+        print(result)
+
+    @staticmethod
     def backtrack_for_data(model_object: Model, result=dict()):  # noqa
 
         field_names = RevertTool.collect_field_names(model_object)
@@ -85,7 +112,7 @@ class RevertTool:
         if not RevertTool.is_revertible(model_object):
             raise ValueError(""
                              "A model must inherit from GitPratIDModel"
-                             "in order to be revertible "
+                             "in order to be revertible"
                              "")
 
         if not RevertTool.has_parents(model_object):
