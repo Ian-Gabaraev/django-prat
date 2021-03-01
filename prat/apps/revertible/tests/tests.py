@@ -9,9 +9,9 @@ import json
 class GitPratTest(TransactionTestCase):
 
     @staticmethod
-    def get_simple_dummy_object_unrelated() -> SimpleUntrackedModel:
+    def get_simple_untracked_model_object() -> SimpleUntrackedModel:
         """
-        Создание throwaway объекта SimpleModelDoesNotInheritGitPratIDModel
+        Создание throwaway объекта SimpleUntrackedModel
 
         """
         dummy_object = SimpleUntrackedModel.objects.create(  # noqa
@@ -20,9 +20,9 @@ class GitPratTest(TransactionTestCase):
         return dummy_object
 
     @staticmethod
-    def get_simple_dummy_object_related() -> SimpleTrackedModel:
+    def get_simple_tracked_model_object() -> SimpleTrackedModel:
         """
-        Создание throwaway объекта SimpleModel
+        Создание throwaway объекта SimpleTrackedModel
 
         """
         dummy_object = SimpleTrackedModel.objects.create(  # noqa
@@ -31,9 +31,9 @@ class GitPratTest(TransactionTestCase):
         return dummy_object
 
     @staticmethod
-    def get_complex_dummy_object_related() -> ComplexTrackedModel:
+    def get_complex_tracked_model_object() -> ComplexTrackedModel:
         """
-        Создание throwaway объекта ComplexModel
+        Создание throwaway объекта ComplexTrackedModel
 
         """
         dummy_relation = DummyParentModel.objects.create(field="Lorem ipsum")  # noqa
@@ -42,48 +42,37 @@ class GitPratTest(TransactionTestCase):
 
         return dummy_complex_object
 
-    @staticmethod
-    def get_complex_dummy_object_un_related() -> SimpleTrackedModel:
-        """
-        Создание throwaway объекта ComplexModel
-
-        """
-        dummy_object = SimpleTrackedModel.objects.create(  # noqa
-            title="Random title", price=100)
-
-        return dummy_object
-
-    def test_fails_on_snapshotting_non_revert_id_subclass(self):
+    def test_fails_on_snapshotting_untracked_model_object(self):
         """
         Ожидается, что попытка сохранить объект модели,
-        которая не наследует GitPratIDModel, вызовет ошибку
+        которая не наследует TrackedModelBase, вызовет ошибку
 
         """
-        dummy_object = self.get_simple_dummy_object_unrelated()
+        dummy_object = self.get_simple_untracked_model_object()
 
         with self.assertRaises(ValueError):
             RevertTool.make_snapshot(dummy_object)
 
-    def test_is_revertible_detect_revertible_models_correctly(self):
+    def test_detects_tracked_models_correctly(self):
         """
         Ожидается, что метод is_revertible вернет True, если
-        переданный аргумент является объектом наследника GitPratIDModel
+        переданный аргумент является объектом наследника TrackedModelBase
 
         """
 
         self.assertTrue(
-            RevertTool.is_revertible(self.get_simple_dummy_object_related())
+            RevertTool.is_revertible(self.get_simple_tracked_model_object())
         )
 
-    def test_is_revertible_detect_non_revertible_models_correctly(self):
+    def test_detects_non_revertible_models_correctly(self):
         """
         Ожидается, что метод is_revertible вернет False, если
-        переданный аргумент не является объектом наследника GitPratIDModel
+        переданный аргумент не является объектом наследника TrackedModelBase
 
         """
 
         self.assertFalse(
-            RevertTool.is_revertible(self.get_simple_dummy_object_unrelated())
+            RevertTool.is_revertible(self.get_simple_untracked_model_object())
         )
 
     def test_collects_fields_properly_simple_model(self):
@@ -95,16 +84,16 @@ class GitPratTest(TransactionTestCase):
 
         self.assertEqual(
             ["id", "git_prat_id", "title", "price"],
-            RevertTool.collect_field_names(self.get_simple_dummy_object_related())
+            RevertTool.collect_field_names(self.get_simple_tracked_model_object())
         )
 
-    def test_make_snapshot_simple_model_accurate(self):
+    def test_makes_accurate_snapshot_for_simple_tracked_model_object(self):
         """
         Ожидается, что возвращаемое значение метода
         make_snapshot имеет определенную структуру
 
         """
-        dummy_object = self.get_simple_dummy_object_related()
+        dummy_object = self.get_simple_tracked_model_object()
         dummy_object_snapshot = RevertTool.make_snapshot(dummy_object)
 
         self.assertEqual(
@@ -117,39 +106,37 @@ class GitPratTest(TransactionTestCase):
             dummy_object_snapshot
         )
 
-    def test_make_snapshot_simple_store_successful(self):
+    def test_stores_simple_tracked_model_object_snapshot_successfully(self):
         """
         Ожидается, что возвращаемый методом make_snapshot
         dictionary сохраняется в объект Snapshot
         без ошибок
 
         """
-        dummy_object = self.get_simple_dummy_object_related()
+        dummy_object = self.get_simple_tracked_model_object()
         dummy_object_snapshot = RevertTool.make_snapshot(dummy_object)
 
         Snapshot.objects.create(snapshot=dummy_object_snapshot)  # noqa
 
-    def test_collects_fields_properly_complex_model(self):
+    def test_collects_complex_tracked_model_object_fields_accurately(self):
         """
         Ожидается, что метод collect_fields вернет полный
-        набор полей объекта ComplexModel, переданного в кач-ве аргумента
+        набор полей объекта ComplexTrackedModel, переданного в кач-ве аргумента
 
         """
 
         self.assertEqual(
             ["id", "git_prat_id", "title", "price", "dummy"],
-            RevertTool.collect_field_names(self.get_complex_dummy_object_related())
+            RevertTool.collect_field_names(self.get_complex_tracked_model_object())
         )
 
-    def test_make_snapshot_complex_model_accurate(self):
+    def test_snapshots_complex_model_object_accurately(self):
         """
         Ожидается, что возвращаемое значение метода
         make_snapshot имеет определенную структуру
 
         """
-        dummy_complex_object = self.get_complex_dummy_object_related()
-
-        print(dummy_complex_object.dummychildmodel_set.all())
+        dummy_complex_object = self.get_complex_tracked_model_object()
 
         self.assertEqual(
             {
@@ -165,7 +152,7 @@ class GitPratTest(TransactionTestCase):
             RevertTool.make_snapshot(dummy_complex_object)
         )
 
-    def test_has_parents_returns_true_for_complex_object(self):
+    def test_has_parents_method_returns_true_for_complex_object(self):
         """
         Ожидается, что has_parents вернет True, если объект
         переданной в аргументах модели связан
@@ -173,9 +160,9 @@ class GitPratTest(TransactionTestCase):
 
         """
 
-        self.assertTrue(RevertTool.has_parents(self.get_complex_dummy_object_related()))
+        self.assertTrue(RevertTool.has_parents(self.get_complex_tracked_model_object()))
 
-    def test_has_parents_returns_false_for_complex_object(self):
+    def test_has_parents_returns_false_for_simple_object(self):
         """
         Ожидается, что has_parents вернет False, если объект
         переданной в аргументах модели не связан
@@ -183,16 +170,16 @@ class GitPratTest(TransactionTestCase):
 
         """
 
-        self.assertFalse(RevertTool.has_parents(self.get_complex_dummy_object_un_related()))
+        self.assertFalse(RevertTool.has_parents(self.get_simple_tracked_model_object()))
 
-    def test_make_snapshot_complex_model_valid_json(self):
+    def test_complex_tracked_model_object_snapshot_converts_into_valid_json(self):
         """
         Ожидается, что снэпшот сложной модели конверитируется
         в JSON-formatted string
 
         """
         json.dumps(
-            RevertTool.make_snapshot(self.get_complex_dummy_object_related()),
+            RevertTool.make_snapshot(self.get_complex_tracked_model_object()),
             indent=4)
 
     def test_revert_simple_model_one_step_successful(self):
