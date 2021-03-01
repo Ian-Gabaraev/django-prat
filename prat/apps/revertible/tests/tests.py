@@ -1,52 +1,54 @@
 from django.test import TransactionTestCase
 from .utils import RevertTool
-from .models import SimpleModel, SimpleModelDoesNotInheritGitPratIDModel, \
-    Snapshot, DummyParentModel, ComplexModel, DummyChildModel
+from .models import SimpleTrackedModel, SimpleUntrackedModel, \
+    Snapshot, DummyParentModel, ComplexTrackedModel
+
+import json
 
 
 class GitPratTest(TransactionTestCase):
 
     @staticmethod
-    def get_simple_dummy_object_unrelated() -> SimpleModelDoesNotInheritGitPratIDModel:
+    def get_simple_dummy_object_unrelated() -> SimpleUntrackedModel:
         """
         Создание throwaway объекта SimpleModelDoesNotInheritGitPratIDModel
 
         """
-        dummy_object = SimpleModelDoesNotInheritGitPratIDModel.objects.create(  # noqa
+        dummy_object = SimpleUntrackedModel.objects.create(  # noqa
             title="Random title", price=100)
 
         return dummy_object
 
     @staticmethod
-    def get_simple_dummy_object_related() -> SimpleModel:
+    def get_simple_dummy_object_related() -> SimpleTrackedModel:
         """
         Создание throwaway объекта SimpleModel
 
         """
-        dummy_object = SimpleModel.objects.create(  # noqa
+        dummy_object = SimpleTrackedModel.objects.create(  # noqa
             title="Random title", price=100)
 
         return dummy_object
 
     @staticmethod
-    def get_complex_dummy_object_related() -> SimpleModelDoesNotInheritGitPratIDModel:
+    def get_complex_dummy_object_related() -> ComplexTrackedModel:
         """
-        Создание throwaway объекта SimpleModelDoesNotInheritGitPratIDModel
+        Создание throwaway объекта ComplexModel
 
         """
-        dummy_relation = DummyParentModel.objects.create(field="Lorem ipsum")
-        dummy_complex_object = ComplexModel.objects.create(  # noqa
+        dummy_relation = DummyParentModel.objects.create(field="Lorem ipsum")  # noqa
+        dummy_complex_object = ComplexTrackedModel.objects.create(  # noqa
             title="Random title", price=100, dummy=dummy_relation)
 
         return dummy_complex_object
 
     @staticmethod
-    def get_complex_dummy_object_un_related() -> SimpleModel:
+    def get_complex_dummy_object_un_related() -> SimpleTrackedModel:
         """
         Создание throwaway объекта ComplexModel
 
         """
-        dummy_object = SimpleModel.objects.create(  # noqa
+        dummy_object = SimpleTrackedModel.objects.create(  # noqa
             title="Random title", price=100)
 
         return dummy_object
@@ -107,7 +109,7 @@ class GitPratTest(TransactionTestCase):
 
         self.assertEqual(
             {
-                "id": dummy_object.id,
+                "id": dummy_object.id,  # noqa
                 "git_prat_id": str(dummy_object.git_prat_id),
                 "title": dummy_object.title,
                 "price": dummy_object.price
@@ -125,7 +127,7 @@ class GitPratTest(TransactionTestCase):
         dummy_object = self.get_simple_dummy_object_related()
         dummy_object_snapshot = RevertTool.make_snapshot(dummy_object)
 
-        Snapshot.objects.create(snapshot=dummy_object_snapshot)
+        Snapshot.objects.create(snapshot=dummy_object_snapshot)  # noqa
 
     def test_collects_fields_properly_complex_model(self):
         """
@@ -146,16 +148,21 @@ class GitPratTest(TransactionTestCase):
 
         """
         dummy_complex_object = self.get_complex_dummy_object_related()
-        dummy_complex_object_snapshot = RevertTool.make_snapshot(dummy_complex_object)
+
+        print(dummy_complex_object.dummychildmodel_set.all())
 
         self.assertEqual(
             {
-                "id": dummy_complex_object.id,
-                "git_prat_id": str(dummy_complex_object.git_prat_id),
+                "id": dummy_complex_object.id,  # noqa
+                "git_prat_id": str(dummy_complex_object.git_prat_id),  # noqa
                 "title": dummy_complex_object.title,
-                "price": dummy_complex_object.price
+                "price": dummy_complex_object.price,
+                'dummy': {
+                    'id': dummy_complex_object.dummy.id,  # noqa
+                    'field': dummy_complex_object.dummy.field,  # noqa
+                }
             },
-            dummy_complex_object_snapshot
+            RevertTool.make_snapshot(dummy_complex_object)
         )
 
     def test_has_parents_returns_true_for_complex_object(self):
@@ -176,10 +183,17 @@ class GitPratTest(TransactionTestCase):
 
         """
 
-        self.assertFalse(RevertTool.has_parents(self.get_simple_dummy_object_related()))
+        self.assertFalse(RevertTool.has_parents(self.get_complex_dummy_object_un_related()))
 
     def test_make_snapshot_complex_model_valid_json(self):
-        pass
+        """
+        Ожидается, что снэпшот сложной модели конверитируется
+        в JSON-formatted string
+
+        """
+        json.dumps(
+            RevertTool.make_snapshot(self.get_complex_dummy_object_related()),
+            indent=4)
 
     def test_revert_simple_model_one_step_successful(self):
         pass

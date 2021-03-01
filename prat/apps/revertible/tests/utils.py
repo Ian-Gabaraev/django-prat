@@ -1,12 +1,12 @@
 from django.db.models import Model
-from .models import GitPratIDModel, GitPratModelDependency
+from .models import TrackedModelBase
 
 
 class RevertTool:
 
     @staticmethod
     def is_revertible(model_object: Model) -> bool:
-        return GitPratIDModel in model_object.__class__.__mro__
+        return TrackedModelBase in model_object.__class__.__mro__
 
     @staticmethod
     def has_parents(model_object: Model) -> bool:
@@ -62,9 +62,23 @@ class RevertTool:
         }
 
     @staticmethod
-    def backtrack_for_data(model_object: Model):
+    def backtrack_for_data(model_object: Model, result=dict()):  # noqa
 
-        pass
+        field_names = RevertTool.collect_field_names(model_object)
+
+        model_obj_as_dictionary = {
+            field_name: getattr(model_object, field_name)
+            for field_name in field_names
+        }
+
+        for key, value in model_obj_as_dictionary.items():
+            if isinstance(value, Model):
+                result[key] = {}
+                RevertTool.backtrack_for_data(value, result[key])
+            else:
+                result[key] = value
+
+        return result
 
     @staticmethod
     def make_snapshot(model_object: Model):
@@ -74,9 +88,7 @@ class RevertTool:
                              "in order to be revertible "
                              "")
 
-        basic_snapshot = RevertTool.collect_simple_fields(model_object)
-
         if not RevertTool.has_parents(model_object):
-            return basic_snapshot
+            return RevertTool.collect_simple_fields(model_object)
         else:
-            pass
+            return RevertTool.backtrack_for_data(model_object)
